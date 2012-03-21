@@ -1,0 +1,123 @@
+#!/usr/bin/env perl
+use warnings;
+use English;
+use strict;
+
+use POSIX qw(strftime :sys_wait_h);
+use Time::HiRes;
+use IPC::Lite qw( %kids );
+use Getopt::Long;
+use Socket;
+
+use constant OK => 0;
+use constant FAIL => -1;
+
+
+sub spawn(@) {
+	my @hosts = @_;
+
+	for my $host (@hosts) {
+		my $pid = fork();
+		$pid > 0 and next;
+
+		alarm(1);
+		bot($host);
+		exit 0;
+	}
+}
+
+sub mk_zone($$$$$) {
+	my ($kids, $file, $zone, $host, $interval) = @_;
+	local $_;
+
+	$zone .= '.';
+	open my $fh, '>' . $file;
+	select $fh;
+	my $stamp = time();
+
+	open my $tmpl, 'dns-zone-template.txt';
+	while (<$tmpl>) {
+		s/\{ZONE\}/$zone/g;
+		s/\{INTERVAL\}/$interval/g;
+		print;
+	}
+	close $tmpl;
+
+	for (keys %$kids) {
+		if ($kids->{$_}{'result'} != OK) { next; }
+		print join "\t", ('','', 'IN','A', $kids->{$_}{'host'}, "\n");
+	}
+	select STDOUT;
+	close $fh;
+}
+
+sub kids_copy($$) {
+	my $kids = shift;
+	my $kids_old = shift;
+	local $_;
+
+	for (keys %$kids) {
+		$kids_old->{$_}{'result'} = $kids->{$_}{'result'};
+		$kids_old->{$_}{'host'} = $kids->{$_}{'host'};
+	}
+}
+sub kids_diff($$){
+	my $kids = shift;
+	my $kids_old = shift;
+	local $_;
+
+	for (keys %$kids) {
+		if (! defined( $kids_old->{$_}{'result'} ) ) { return 1; }
+		if ($kids->{$_}{'result'} != $kids_old->{$_}{'result'}) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+sub logs($) { print STDERR POSIX::strftime('%Y%m%d %H:%M:%S ',localtime()) . $_[0] . "\n" }
+
+sub host_to_ip($) {
+	my $host = $_[0];
+	chomp($host);
+	my $packed_ip = gethostbyname($host);
+	if (! defined $packed_ip) {
+		logs "unable to resolve $host";
+		return;
+	}
+	return inet_ntoa($packed_ip);
+}
+
+
+our %cfg;
+our %kids = ();
+our %kids_last = ();
+GetOptions(\%cfg, 'interval=i', 'hosts_file=s', 'zone_file=s', 'zone=s', 'bind_cmd=s', 'bot_file=s');
+if (! defined( $cfg{'bind_cmd'})) {
+	$cfg{'bind_cmd'} = 'killall -HUP named';
+}
+if ($cfg{'bot_file'} eq '') { die "need bot_file option"; }
+do $cfg{'bot_file'};
+
+while (1) {
+	my $start = Time::HiRes::time();
+	kids_copy(\%kids, \%kids_last);
+	%kids = ();
+	my @hosts = map { host_to_ip $_ } `cat $cfg{'hosts_file'}`;
+	if (scalar(@hosts) == 0) {
+		logs('empty hosts file: ' . $cfg{'hosts_file'});
+		exit 1;
+	}
+	spawn( @hosts );
+	while ( (my $k = wait()) > 0) {
+		if ( $kids{$k}{'result'} == FAIL ) {
+			logs( 'failed host: ' . $kids{$k}{'host'} );
+		}
+	}
+
+	if (kids_diff(\%kids, \%kids_last)) {
+		mk_zone(\%kids, $cfg{'zone_file'}, $cfg{'zone'}, $cfg{'host'}, $cfg{'interval'});
+		system( $cfg{'bind_cmd'} );
+	}
+	Time::HiRes::usleep(1_000_000 * ( $cfg{'interval'} - (Time::HiRes::time() - $start)));
+}

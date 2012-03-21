@@ -1,0 +1,33 @@
+Load-balancing for ISC BIND
+
+BIND supports round-robin DNS, which allows us to distribute load amongst
+machines. However, BIND will continue to distribute load to machines even when
+those machines are over-loaded or offline.
+
+This package will monitor your services and remove the machines that fail to
+reply to requests in time. Currently supported services are:
+	LDAP
+	ping
+
+
+Install Instructions
+
+Make sure your machine has BIND, perl, sqlite, and IPC::Lite 
+
+Edit dns-zone-template.txt for your domains nameservers, contacts, TTLs, etc.
+{ZONE} and {INTERVAL} will be updated automatically.
+
+Edit load-hosts.txt and add the hosts to monitor, one per line 
+
+Edit load.sh to specify the options:
+	--interval=  
+		How often to monitor
+	--hosts_file= 
+		What file has the hosts to monitor
+	--zone_file= 
+		Where is BIND expecting the zonefile to be
+	--zone=  
+		The zone to round-robin for
+	--bot_file=
+		Which monitoring to use
+
