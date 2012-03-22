@@ -119,5 +119,9 @@ while (1) {
 		mk_zone(\%kids, $cfg{'zone_file'}, $cfg{'zone'}, $cfg{'host'}, $cfg{'interval'});
 		system( $cfg{'bind_cmd'} );
 	}
-	Time::HiRes::usleep(1_000_000 * ( $cfg{'interval'} - (Time::HiRes::time() - $start)));
+
+	my $us = 1_000_000 * ( $cfg{'interval'} - (Time::HiRes::time() - $start));
+	if ($us > 0) {
+		Time::HiRes::usleep( $us );
+	}
 }

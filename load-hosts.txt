@@ -1,3 +1,4 @@
+ldap1.rabbit.cluster.ofs.edu.sg
 ldap2.rabbit.cluster.ofs.edu.sg
 ldap3.rabbit.cluster.ofs.edu.sg
 ldap4.rabbit.cluster.ofs.edu.sg
