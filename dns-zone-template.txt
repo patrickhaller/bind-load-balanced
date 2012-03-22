@@ -1,7 +1,7 @@
 $ORIGIN {ZONE}
 $TTL {INTERVAL}S
 @               IN      SOA     ns1.dom.tld. root.dom.tld. (
-                        $stamp            ; Serial
+                        {STAMP}           ; Serial
                         2H                ; Refresh
                         30M               ; Retry 1 hour
                         1W                ; Expiry
