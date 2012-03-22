@@ -39,6 +39,7 @@ sub mk_zone($$$$$) {
 	while (<$tmpl>) {
 		s/\{ZONE\}/$zone/g;
 		s/\{INTERVAL\}/$interval/g;
+		s/\{STAMP\}/$stamp/g;
 		print;
 	}
 	close $tmpl;
@@ -57,8 +58,7 @@ sub kids_copy($$) {
 	local $_;
 
 	for (keys %$kids) {
-		$kids_old->{$_}{'result'} = $kids->{$_}{'result'};
-		$kids_old->{$_}{'host'} = $kids->{$_}{'host'};
+		$kids_old->{ $kids->{$_}{'host'} } = $kids->{$_}{'result'};
 	}
 }
 sub kids_diff($$){
@@ -66,9 +66,13 @@ sub kids_diff($$){
 	my $kids_old = shift;
 	local $_;
 
+	if ( scalar (keys %$kids) != scalar (keys %$kids_old) ) {
+		return 1;
+	}
+
 	for (keys %$kids) {
-		if (! defined( $kids_old->{$_}{'result'} ) ) { return 1; }
-		if ($kids->{$_}{'result'} != $kids_old->{$_}{'result'}) {
+		if (! defined( $kids_old->{  $kids->{$_}{'host'} } ) ) { return 1; }
+		if ($kids->{$_}{'result'} != $kids_old->{ $kids->{$_}{'host'} } ) {
 			return 1;
 		}
 	}
@@ -101,7 +105,6 @@ do $cfg{'bot_file'};
 
 while (1) {
 	my $start = Time::HiRes::time();
-	kids_copy(\%kids, \%kids_last);
 	%kids = ();
 	my @hosts = map { host_to_ip $_ } `cat $cfg{'hosts_file'}`;
 	if (scalar(@hosts) == 0) {
@@ -119,6 +122,8 @@ while (1) {
 		mk_zone(\%kids, $cfg{'zone_file'}, $cfg{'zone'}, $cfg{'host'}, $cfg{'interval'});
 		system( $cfg{'bind_cmd'} );
 	}
+	%kids_last = ();
+	kids_copy(\%kids, \%kids_last);
 
 	my $us = 1_000_000 * ( $cfg{'interval'} - (Time::HiRes::time() - $start));
 	if ($us > 0) {
