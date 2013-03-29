@@ -8,7 +8,7 @@ This package will monitor your services and remove the machines that fail to
 reply to requests in time. Currently supported services are:
 	LDAP
 	ping
-	smtp
+	SMTP
 
 
 Install Instructions
