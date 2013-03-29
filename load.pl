@@ -5,7 +5,7 @@ use strict;
 
 use POSIX qw(strftime :sys_wait_h);
 use Time::HiRes;
-use IPC::Lite qw( %kids );
+use IPC::Lite Key=>"load-balance-$$", qw( %kids );
 use Getopt::Long;
 use Socket;
 
@@ -31,7 +31,8 @@ sub mk_zone($$$$$) {
 	local $_;
 
 	$zone .= '.';
-	open my $fh, '>' . $file;
+	my $tmp = $file . '.tmp';
+	open my $fh, '>' . $tmp;
 	select $fh;
 	my $stamp = time();
 
@@ -50,6 +51,7 @@ sub mk_zone($$$$$) {
 	}
 	select STDOUT;
 	close $fh;
+	rename $tmp, $file;
 }
 
 sub kids_copy($$) {
